@@ -42,4 +42,11 @@ def set_Cabin_type(df):
 data_train, rfr = set_missing_ages(data_train)
 data_train = set_Cabin_type(data_train)
 
-print(data_train.head())
+dummies_Cabin = pd.get_dummies(data_train['Cabin'], prefix='Cabin')
+dummies_Embarked = pd.get_dummies(data_train['Embarked'], prefix='Embarked')
+dummies_Sex = pd.get_dummies(data_train['Sex'], prefix='Sex')
+dummies_Pclass = pd.get_dummies(data_train['Pclass'], prefix='Pclass')
+
+df = pd.concat([data_train, dummies_Cabin, dummies_Embarked, dummies_Sex, dummies_Pclass], axis=1)
+df.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
+print(df.head())
