@@ -1,5 +1,8 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
+import sklearn.preprocessing as preprocessing
+from sklearn import linear_model
+import numpy as np
 
 fpath = "./data/train.csv"
 data_train = pd.read_csv(fpath)
@@ -49,4 +52,49 @@ dummies_Pclass = pd.get_dummies(data_train['Pclass'], prefix='Pclass')
 
 df = pd.concat([data_train, dummies_Cabin, dummies_Embarked, dummies_Sex, dummies_Pclass], axis=1)
 df.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
-print(df.head())
+
+scaler = preprocessing.StandardScaler()
+reshape_age=np.array(df['Age']).reshape(len(df['Age']),1)
+reshape_fare=np.array(df['Fare']).reshape(len(df['Fare']),1)
+age_scale_param = scaler.fit(reshape_age)
+df['Age_scaled'] = scaler.fit_transform(reshape_age, age_scale_param)
+fare_scale_param = scaler.fit(reshape_fare)
+df['Fare_scaled'] = scaler.fit_transform(reshape_fare, fare_scale_param)
+
+train_df = df.filter(regex='Survived|Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Embarked_.*|Sex_.*|Pclass_.*')
+train_np = train_df.values
+
+y = train_np[:, 0]
+X = train_np[:, 1:]
+
+clf = linear_model.LogisticRegression(C=1.0, penalty='l2', tol=1e-6)
+clf.fit(X, y)
+
+data_test=pd.read_csv("./data/test.csv")
+data_test.loc[(data_test.Fare.isnull()),'Fare']=0
+
+tmp_df = data_test[['Age','Fare', 'Parch', 'SibSp', 'Pclass']]
+null_age = tmp_df[data_test.Age.isnull()].values
+
+X = null_age[:, 1:]
+predictedAges = rfr.predict(X)
+data_test.loc[ (data_test.Age.isnull()), 'Age' ] = predictedAges
+
+data_test = set_Cabin_type(data_test)
+dummies_Cabin = pd.get_dummies(data_test['Cabin'], prefix= 'Cabin')
+dummies_Embarked = pd.get_dummies(data_test['Embarked'], prefix= 'Embarked')
+dummies_Sex = pd.get_dummies(data_test['Sex'], prefix= 'Sex')
+dummies_Pclass = pd.get_dummies(data_test['Pclass'], prefix= 'Pclass')
+
+
+df_test = pd.concat([data_test, dummies_Cabin, dummies_Embarked, dummies_Sex, dummies_Pclass], axis=1)
+df_test.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
+reshape_age_2=np.array(df_test['Age']).reshape(len(df_test['Age']),1)
+reshape_fare_2=np.array(df_test['Fare']).reshape(len(df_test['Fare']),1)
+df_test['Age_scaled'] = scaler.fit_transform(reshape_age_2, age_scale_param)
+df_test['Fare_scaled'] = scaler.fit_transform(reshape_fare_2, fare_scale_param)
+
+test = df_test.filter(regex='Age_.*|SibSp|Parch|Fare_.*|Cabin_.*|Embarked_.*|Sex_.*|Pclass_.*')
+predictions = clf.predict(test)
+result = pd.DataFrame({'PassengerId':data_test['PassengerId'].values, 'Survived':predictions.astype(np.int32)})
+result.to_csv("./data/logistic_regression_predictions.csv", index=False)
